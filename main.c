@@ -1,9 +1,11 @@
 /*
-* mainad5933.c
-*
-* Created: 2/28/2022 2:30:51 PM
-* Author : DELL
-*/
+ * ad5933_nocal.c
+ *
+ * Created: 27/05/2022 5:27:30 pm
+ * Author : DELL
+ */ 
+
+
 #define F_CPU 8000000UL
 
 #include <avr/io.h>
@@ -57,12 +59,8 @@ int  main  (void)
 	DDRA=(1<<PA0);
 	//Declaration  of  variables
 	unsigned  char*  data;
-	//char  s[6];
-	//char  x[6];
-	//char  y[6];
+	
 	int R, I, j;
-	double Magnitude;
-	int freqcount=0;
 	unsigned  long  int  i,  kl;
 	char *val;
 	unsigned char real_high, real_low;
@@ -90,7 +88,6 @@ int  main  (void)
 			PORTA=(1<<PA0);
 		}
 		
-		//USART_CharTransmit("AD5933");
 	}
 	else
 	{
@@ -216,132 +213,30 @@ int  main  (void)
 	//Waits  until  the  real  and  imaginary  data  in  the  AD5933 	is  valid
 	while(!(TWI_byte_read(status_reg)  &  0x02));
 	
-	//sprintf(txBuf, "Cal_check = %d", cal_check);
-	//USART_CharTransmit(txBuf);
-	//_delay_ms(200);
-	//
-	//sprintf(txBuf, "freqcount = %d\n", freqcount);
-	//USART_CharTransmit(txBuf);
-	//_delay_ms(200);
 	
 	//Reads  the  two  hex  values  from  the  real  register
 	real_high=TWI_byte_read(real_high_reg);
 	real_low=TWI_byte_read(real_low_reg);
 	//Converting  the  real  value  to  decimal
 	R = hextodec(real_high, real_low);
-	_delay_ms(10);
-	//Converts  to  aascii  for  transmission  to  computer
-	//itoa(R,  s,  10);
-	//USART_CharTransmit("R=");
-	//USART_CharTransmit(s);
-	//sprintf(txBuf, "R = %d\n", R);
-	//USART_CharTransmit(txBuf);
-	//_delay_ms(200);
+	_delay_ms(10);	
 	
 	im_high = TWI_byte_read(im_high_reg);
 	im_low = TWI_byte_read(im_low_reg);
 	I = hextodec(im_high, im_low);
 	_delay_ms(10);
-	//itoa(I,  x,  10);
-	//USART_CharTransmit("I=");
-	//USART_CharTransmit(x);
-	//sprintf(txBuf, "I = %d\n", I);
-	//USART_CharTransmit(txBuf);
-	//_delay_ms(200);
-	
-	Magnitude = sqrt(pow(R,2)+pow(I,2));
-	//itoa(Magnitude,  y,  10);
-	//USART_CharTransmit("Magnitude=");
-	//USART_CharTransmit(y);
-	//sprintf(txBuf, "Mag = %lf\n", Magnitude);
-	//USART_CharTransmit(txBuf);
-	//_delay_ms(200);
 	
 	
-	if (cal_check==0)
-	{
-		Rgain[freqcount] = R;
-		Igain[freqcount] = I;
-		gainfactor[freqcount]=pow(10,12) * ((1/Rcalibration) / sqrt(pow(Rgain[freqcount],2) + pow(Igain[freqcount],2)));
-		Impedance=pow(10,12) / (gainfactor[freqcount] * Magnitude);
-		if (R>0 && I>0)
-		{
-			sys_phase[freqcount] = atan((double)Igain[freqcount] / (double)Rgain[freqcount]) * 57.2957795;
-		}
-		if (R>0 && I<0)
-		{
-			sys_phase[freqcount] = 360 + atan((double)Igain[freqcount] / (double)Rgain[freqcount]) * 57.2957795;
-		}
-		if ((R<0 && I>0) || (R<0 && I<0))
-		{
-			sys_phase[freqcount] = 180 + atan((double)Igain[freqcount] / (double)Rgain[freqcount]) * 57.2957795;
-		}
-		
-		//sprintf(txBuf, "Rg = %d\n", Rgain[freqcount]);
-		//USART_CharTransmit(txBuf);
-		//_delay_ms(200);
-		
-		//sprintf(txBuf, "Ig = %d\n", Igain[freqcount]);
-		//USART_CharTransmit(txBuf);
-		//_delay_ms(200);
-		
-	}
-	
-	if (cal_check==1)
-	{
-		Impedance = pow(10,12) / (gainfactor[freqcount] * Magnitude);
-		if (R>0 && I>0)
-		{
-			phase = atan((double)I/(double)R) * 57.2957795 - sys_phase[freqcount];
-		}
-		if (R>0 && I<0)
-		{
-			phase = 360 + atan((double)I/(double)R) * 57.2957795 - sys_phase[freqcount];
-		}
-		if ((R<0 && I>0) || (R<0 && I<0))
-		{
-			phase = 180 + atan((double)I/(double)R) * 57.2957795 - sys_phase[freqcount];
-		}
-		//sprintf(txBuf, "Imp = %lf\n", Impedance);
-		//USART_CharTransmit(txBuf);
-		//_delay_ms(200);
-	}
-	
-	
-	//sprintf(txBuf, "Rg = %d\n", Rgain[freqcount]);
-	//USART_CharTransmit(txBuf);
-	//_delay_ms(200);
-	//
-	//sprintf(txBuf, "Ig = %d\n", Igain[freqcount]);
-	//USART_CharTransmit(txBuf);
-	//_delay_ms(200);
-	//
-	//sprintf(txBuf, "gain = %lf\n", gainfactor[freqcount]);
-	//USART_CharTransmit(txBuf);
-	//_delay_ms(200);
-	
-	sprintf(txBuf, "%lf", Impedance);
+	//Transmit R,I 
+	sprintf(txBuf, "%d", R);
 	USART_CharTransmit(txBuf);
-	_delay_ms(100);
-	
+	_delay_ms(200);
 	USART_transmit(',');
-	
-	sprintf(txBuf, "%lf", phase);
+	sprintf(txBuf, "%d", I);
 	USART_CharTransmit(txBuf);
-	_delay_ms(100);
-	
+	_delay_ms(200);
 	USART_transmit('\n');
 	
-	freqcount++;
-	if (cal_check==0 && freqcount>51)
-	{
-		cal_check=1;
-		freqcount=0;
-	}
-	if (cal_check==1 && freqcount>51)
-	{
-		freqcount=0;
-	}
 	
 	//Test  if  the  sweep  is  complete,  if  not  complete  program  increment  frequency
 	if((TWI_byte_read(status_reg)  &  0x04)==0)
@@ -365,9 +260,11 @@ int  main  (void)
 	//If  complete  programming  power  down  mode
 	else{
 		TWI_byte_write(control_high_reg,  0xA1);
-		//USART_CharTransmit("endfreq");
+		
 		goto  com;
 	}
 }
+
+
 
 

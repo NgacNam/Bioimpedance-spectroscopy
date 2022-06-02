@@ -27,7 +27,7 @@ void  USART_transmit(char  data){
 }
 
 int  USART_receive(void){
-	char  data;
+	//char  data;
 	//  Do  nothing  until  data  have  been  recieved  and  is  ready  to  be  read 	from  UDR
 	while  ((UCSRA  &  (1  <<  RXC))  ==  0)  {};
 	return  UDR;
