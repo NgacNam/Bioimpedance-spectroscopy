@@ -56,7 +56,7 @@ unsigned  long  int  hextodec(unsigned  char  data_high, unsigned  char  data_lo
 
 int  main  (void)
 {
-	DDRA=(1<<PA0);
+	DDRD=(1<<PD4);
 	//Declaration  of  variables
 	unsigned  char*  data;
 	
@@ -85,7 +85,7 @@ int  main  (void)
 	{
 		if (val!="")
 		{
-			PORTA=(1<<PA0);
+			//nothing
 		}
 		
 	}
@@ -97,7 +97,7 @@ int  main  (void)
 	//USART_CharTransmit("AD5933");
 	//Setting  startfreq  routine
 	//startfreq=atoi(USART_CharReceive());
-	startfreq=10000;
+	startfreq=5000;
 	stopfreq=100000;
 	i=startfreq*32.0023195;
 	*data=0x000000ff  &  (i>>16);
@@ -110,7 +110,7 @@ int  main  (void)
 
 	//Setting  number  of  increments
 	//numbinc=atoi(USART_CharReceive());
-	numbinc=50;
+	numbinc=200;
 	*data=0x000000ff & (numbinc>>8);
 	*(data+1)=0x000000ff & numbinc;
 	TWI_block_write(incsteps_reg,  2,  data);
@@ -213,7 +213,7 @@ int  main  (void)
 	//Waits  until  the  real  and  imaginary  data  in  the  AD5933 	is  valid
 	while(!(TWI_byte_read(status_reg)  &  0x02));
 	
-	
+	PORTD=(1<<PD4);
 	//Reads  the  two  hex  values  from  the  real  register
 	real_high=TWI_byte_read(real_high_reg);
 	real_low=TWI_byte_read(real_low_reg);
@@ -230,14 +230,14 @@ int  main  (void)
 	//Transmit R,I 
 	sprintf(txBuf, "%d", R);
 	USART_CharTransmit(txBuf);
-	_delay_ms(200);
+	_delay_ms(100);
 	USART_transmit(',');
 	sprintf(txBuf, "%d", I);
 	USART_CharTransmit(txBuf);
-	_delay_ms(200);
+	_delay_ms(100);
 	USART_transmit('\n');
 	
-	
+	PORTD=(0<<PD4);_delay_ms(100);
 	//Test  if  the  sweep  is  complete,  if  not  complete  program  increment  frequency
 	if((TWI_byte_read(status_reg)  &  0x04)==0)
 	{

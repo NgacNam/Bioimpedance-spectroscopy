@@ -1,3 +1,4 @@
+from tokenize import Double
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QPushButton, QAction, QLineEdit, QMessageBox, QLabel
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSlot
@@ -7,12 +8,15 @@ import numpy as np
 import math
 import serial
 import csv
+import pandas as pd
 from sympy import true
 
 sys_init = 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
-max_freq = 101800
-min_freq = 10000
-inc_step = 51
+csvname = 'result.csv'
+
+inc_step = 201
+min_freq = 5000
+max_freq = 100000 + (100000-min_freq)/inc_step
 Rcalibrate = 10000
 freq_count = 0
 cal_check = False
@@ -32,10 +36,10 @@ class App(QMainWindow):
     def __init__(self):
         super().__init__()
         self.title = 'Do tro khang'
-        self.left = 100
-        self.top = 100
+        self.left = 200
+        self.top = 200
         self.width = 400
-        self.height = 140
+        self.height = 400
         self.UIcompnents()
         self.show()
 
@@ -44,14 +48,14 @@ class App(QMainWindow):
         self.setGeometry(self.left, self.top, self.width, self.height)
 
         # Create textbox
-        self.textbox = QLineEdit(self)
-        self.textbox.move(0, 0)
-        self.textbox.resize(60, 40)
+        self.Rcal_textbox = QLineEdit(self)
+        self.Rcal_textbox.move(0, 0)
+        self.Rcal_textbox.resize(60, 40)
 
         # Create input Rcalibrate
         self.Rcal_button = QPushButton('Input Rcal', self)
-        self.Rcal_button.move(20, 80)
-        self.Rcal_button.clicked.connect(self.on_click)
+        self.Rcal_button.move(0, 60)
+        self.Rcal_button.clicked.connect(self.input_Rcal)
 
         '''btn = QPushButton(w)
         btn.setText('Beheld')
@@ -68,19 +72,24 @@ class App(QMainWindow):
         # Calibrate
         self.calibrate_button = QPushButton(self)
         self.calibrate_button.setText("Calibrate")
-        self.calibrate_button.move(0, 120)
+        self.calibrate_button.move(0, 140)
         self.calibrate_button.clicked.connect(self.calibrate)
+
+        # Create CSV textbox
+        self.csv_textbox = QLineEdit(self)
+        self.csv_textbox.move(100, 100)
+        self.csv_textbox.resize(100, 40)
 
         # CSV button
         self.csv_button = QPushButton(self)
-        self.csv_button.setText(".csv file")
-        self.csv_button.move(0, 140)
+        self.csv_button.setText("Save csv file")
+        self.csv_button.move(0, 180)
         self.csv_button.clicked.connect(self.makecsv)
 
         # Plot button
         self.plot_button = QPushButton(self)
         self.plot_button.setText("Plot")
-        self.plot_button.move(0, 160)
+        self.plot_button.move(0, 220)
         self.plot_button.clicked.connect(self.plot)
 
     def measure(self):
@@ -104,69 +113,83 @@ class App(QMainWindow):
         while True:
             data = s.readline()
             data_list = data.split(b',')
-            real = float(data_list[0])
+            real = np.double(data_list[0])
 
             data1 = data_list[1]
             data1_list = data1.split(b'\n')
-            im = float(data1_list[0])
+            im = np.double(data1_list[0])
 
-            Magnitude = math.sqrt(real**2 + im**2)
+            Magnitude = math.sqrt(np.double(real)**2 + np.double(im)**2)
 
             if cal_check == False:
                 Rgain = np.append(Rgain, real)
                 Igain = np.append(Igain, im)
-                gainfactor = np.append(
-                    gainfactor, (10**12) * ((1/Rcalibrate) / math.sqrt(Rgain[freq_count]**2 + Igain[freq_count]**2)))
+                
+                gainfactor = np.append(gainfactor, (10**12) * ((1/np.double(Rcalibrate)) / math.sqrt(np.double(Rgain[freq_count])**2 + np.double(Igain[freq_count])**2)))
                 #Impedance_str = np.append(Impedance_str, (10**12) / (gainfactor[freq_count] * Magnitude))
                 if (real > 0 and im > 0):
-                    sys_phase = np.append(sys_phase, math.atan(
-                        Igain[freq_count] / Rgain[freq_count]) * 57.2957795)
+                    sys_phase = np.append(sys_phase, math.atan(np.double(Igain[freq_count]) / np.double(Rgain[freq_count])) * 57.2957795)
                 if (real > 0 and im < 0):
-                    sys_phase = np.append(
-                        sys_phase, 360 + math.atan(Igain[freq_count] / Rgain[freq_count]) * 57.2957795)
+                    sys_phase = np.append(sys_phase, 360 + math.atan(np.double(Igain[freq_count]) / np.double(Rgain[freq_count])) * 57.2957795)
                 if ((real < 0 and im > 0) or (real < 0 and im < 0)):
-                    sys_phase = np.append(
-                        sys_phase, 180 + math.atan(Igain[freq_count] / Rgain[freq_count]) * 57.2957795)
+                    sys_phase = np.append(sys_phase, 180 + math.atan(np.double(Igain[freq_count]) / np.double(Rgain[freq_count])) * 57.2957795)
             if cal_check == True:
-                Impedance_str = np.append(
-                    Impedance_str, (10**12) / (gainfactor[freq_count] * Magnitude))
+                Impedance_str = np.append(Impedance_str, (10**12) / (np.double(gainfactor[freq_count]) * np.double(Magnitude)))
                 if (real > 0 and im > 0):
-                    Phase_str = np.append(Phase_str, math.atan(
-                        im/real) * 57.2957795 - sys_phase[freq_count])
+                    Phase_str = np.append(Phase_str, math.atan(np.double(im)/np.double(real)) * 57.2957795 - np.double(sys_phase[freq_count]))
                 if (real > 0 and im < 0):
-                    Phase_str = np.append(
-                        Phase_str, 360 + math.atan(im/real) * 57.2957795 - sys_phase[freq_count])
+                    Phase_str = np.append(Phase_str, 360 + math.atan(np.double(im)/np.double(real)) * 57.2957795 - np.double(sys_phase[freq_count]))
                 if ((real < 0 and im > 0) or (real < 0 and im < 0)):
-                    Phase_str = np.append(
-                        Phase_str, 180 + math.atan(im/real) * 57.2957795 - sys_phase[freq_count])
+                    Phase_str = np.append(Phase_str, 180 + math.atan(np.double(im)/np.double(real)) * 57.2957795 - np.double(sys_phase[freq_count]))
 
             freq_count += 1
-            print(freq_count)
+            print('f=', freq_count)
+            print('re=', real)
+            print('im=', im)
+            print('rg=', Rgain)
+            print('ig=', Igain)
             print(Impedance_str)
             print(Phase_str)
 
-            if freq_count >= 51:
+            if freq_count >= inc_step:
                 freq_count = 0
                 break
+        cal_check = True
 
     def calibrate(self):
-        measure()
-        global cal_check
-        if cal_check == True:
-            cal_check = False
-        else:
-            cal_check = True
+        global cal_check, Rcalibrate, Rgain, Igain, gainfactor, sys_phase, Impedance_str, Phase_str
+        Impedance_str = np.array([])
+        Rgain = np.array([])
+        sys_phase = np.array([])
+        Phase_str = np.array([])
+        Igain = np.array([])
+        gainfactor = np.array([])
+        cal_check = False
+        self.measure()
 
     def makecsv(self):
         global Impedance_str
         global Phase_str
         global freqrange
-        with open('result.csv', 'w', newline='') as file:
+        global csvname
+
+        textboxValue = self.csv_textbox.text()
+        QMessageBox.question(self, 'CSV name', "Save CSV as " +
+                             textboxValue, QMessageBox.Ok)
+        self.csv_textbox.setText("")
+        csvname = textboxValue
+
+        csvdata = pd.DataFrame({'Frequency':freqrange,
+                                'Impedance':Impedance_str,
+                                'Phase':Phase_str})
+        csvdata.to_csv(''+ csvname +'.csv')
+
+        '''with open('1R_1R.csv', 'w', newline='') as file:
+            
             writer = csv.writer(file)
             writer.writerow(["frequency", "impedance", "phase"])
             for val_count in range(51):
-                writer.writerow(
-                    [freqrange[val_count], Impedance_str[val_count], Phase_str[val_count]])
+                writer.writerow([freqrange[val_count], Impedance_str[val_count], Phase_str[val_count]])'''
 
     def plot(self):
 
@@ -201,14 +224,13 @@ class App(QMainWindow):
         Impedance_plot.legend(handles=[line1, line2])
 
     # @pyqtSlot()
-    def on_click(self):
+    def input_Rcal(self):
         global Rcalibrate
-        textboxValue = self.textbox.text()
+        textboxValue = self.Rcal_textbox.text()
         QMessageBox.question(self, 'Rcal', "Rcal =  " +
                              textboxValue, QMessageBox.Ok)
-        self.textbox.setText("")
+        self.Rcal_textbox.setText("")
         Rcalibrate = textboxValue
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
