@@ -1,5 +1,6 @@
 from tokenize import Double
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QPushButton, QAction, QLineEdit, QMessageBox, QLabel
+from PyQt5 import QtCore, QtWidgets, QtSerialPort
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QPushButton, QAction, QLineEdit, QMessageBox, QLabel, QSizePolicy, QTextEdit
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSlot
 import sys
@@ -14,7 +15,7 @@ from sympy import true
 sys_init = 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
 csvname = 'result.csv'
 
-inc_step = 201
+inc_step = 51
 min_freq = 5000
 max_freq = 100000 + (100000-min_freq)/inc_step
 Rcalibrate = 10000
@@ -36,61 +37,105 @@ class App(QMainWindow):
     def __init__(self):
         super().__init__()
         self.title = 'Do tro khang'
-        self.left = 200
-        self.top = 200
-        self.width = 400
-        self.height = 400
+        self.left = 0
+        self.top = 50
+        self.width = 800
+        self.height = 700
         self.UIcompnents()
+        self.serial = QtSerialPort.QSerialPort(
+            'COM6',
+            baudRate=QtSerialPort.QSerialPort.Baud9600,
+            readyRead=self.receive
+        )
         self.show()
 
     def UIcompnents(self):
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
 
+        # Connect button
+        '''self.connect_button = QPushButton(self)
+        self.connect_button.setText("Connect")
+        self.connect_button.move(0, 80)
+        self.connect_button.clicked.connect(self.on_toggled)'''
+
         # Create textbox
         self.Rcal_textbox = QLineEdit(self)
-        self.Rcal_textbox.move(0, 0)
-        self.Rcal_textbox.resize(60, 40)
+        self.Rcal_textbox.move(100, 110)
+        self.Rcal_textbox.resize(100, 30)
 
         # Create input Rcalibrate
         self.Rcal_button = QPushButton('Input Rcal', self)
-        self.Rcal_button.move(0, 60)
+        self.Rcal_button.move(0, 110)
         self.Rcal_button.clicked.connect(self.input_Rcal)
 
-        '''btn = QPushButton(w)
-        btn.setText('Beheld')
-        btn.move(110,150)
-        btn.show()
-        btn.clicked.connect(print_value)'''
 
         # Measure button
         self.measure_button = QPushButton(self)
         self.measure_button.setText("Measure")
-        self.measure_button.move(0, 100)
+        self.measure_button.move(0, 150)
         self.measure_button.clicked.connect(self.measure)
 
         # Calibrate
         self.calibrate_button = QPushButton(self)
         self.calibrate_button.setText("Calibrate")
-        self.calibrate_button.move(0, 140)
+        self.calibrate_button.move(0, 190)
         self.calibrate_button.clicked.connect(self.calibrate)
 
         # Create CSV textbox
         self.csv_textbox = QLineEdit(self)
-        self.csv_textbox.move(100, 100)
-        self.csv_textbox.resize(100, 40)
+        self.csv_textbox.move(100, 230)
+        self.csv_textbox.resize(100, 30)
 
         # CSV button
         self.csv_button = QPushButton(self)
         self.csv_button.setText("Save csv file")
-        self.csv_button.move(0, 180)
+        self.csv_button.move(0, 230)
         self.csv_button.clicked.connect(self.makecsv)
 
         # Plot button
         self.plot_button = QPushButton(self)
         self.plot_button.setText("Plot")
-        self.plot_button.move(0, 220)
+        self.plot_button.move(0, 270)
         self.plot_button.clicked.connect(self.plot)
+
+        '''# Send textbox
+        self.message_send = QLineEdit(self)
+        self.message_send.move(250, 110)
+        self.message_send.resize(300, 30)
+
+        # Send button
+        self.send_btn = QPushButton(self)
+        self.send_btn.setText("Send")
+        self.send_btn.move(560, 110)
+        self.plot_button.clicked.connect(self.send)'''
+        
+        # UART data
+        self.uart_rx = QTextEdit(self)
+        self.uart_rx.move(250, 150)
+        self.uart_rx.resize(500, 500)
+        
+    
+    @QtCore.pyqtSlot()
+    def receive(self):
+        while self.serial.canReadLine():
+            text = self.serial.readLine().data().decode()
+            text = text.rstrip('\r\n')
+            self.uart_rx.append(text)
+
+    @QtCore.pyqtSlot()
+    def send(self):
+        self.serial.write(self.message_send.text().encode())
+
+    @QtCore.pyqtSlot(bool)
+    def on_toggled(self, checked):
+        self.connect_button.setText("Disconnect" if checked else "Connect")
+        if checked:
+            if not self.serial.isOpen():
+                if not self.serial.open(QtCore.QIODevice.ReadWrite):
+                    self.connect_button.setChecked(False)
+        else:
+            self.serial.close()
 
     def measure(self):
         global Impedance_str
@@ -106,12 +151,14 @@ class App(QMainWindow):
         Impedance_str = np.array([])
         Phase_str = np.array([])
         freq_count = 0
+        #global P_sys, P
 
         s = serial.Serial('COM6', 9600)
         s.write(sys_init.encode())
 
         while True:
             data = s.readline()
+            self.uart_rx.append(data.decode())
             data_list = data.split(b',')
             real = np.double(data_list[0])
 
@@ -126,28 +173,28 @@ class App(QMainWindow):
                 Igain = np.append(Igain, im)
                 
                 gainfactor = np.append(gainfactor, (10**12) * ((1/np.double(Rcalibrate)) / math.sqrt(np.double(Rgain[freq_count])**2 + np.double(Igain[freq_count])**2)))
-                #Impedance_str = np.append(Impedance_str, (10**12) / (gainfactor[freq_count] * Magnitude))
                 if (real > 0 and im > 0):
-                    sys_phase = np.append(sys_phase, math.atan(np.double(Igain[freq_count]) / np.double(Rgain[freq_count])) * 57.2957795)
+                    P_sys = math.atan(np.double(Igain[freq_count]) / np.double(Rgain[freq_count])) * 57.2957795
                 if (real > 0 and im < 0):
-                    sys_phase = np.append(sys_phase, 360 + math.atan(np.double(Igain[freq_count]) / np.double(Rgain[freq_count])) * 57.2957795)
+                    P_sys = 360 + math.atan(np.double(Igain[freq_count]) / np.double(Rgain[freq_count])) * 57.2957795
                 if ((real < 0 and im > 0) or (real < 0 and im < 0)):
-                    sys_phase = np.append(sys_phase, 180 + math.atan(np.double(Igain[freq_count]) / np.double(Rgain[freq_count])) * 57.2957795)
+                    P_sys = 180 + math.atan(np.double(Igain[freq_count]) / np.double(Rgain[freq_count])) * 57.2957795
+                sys_phase = np.append(sys_phase, P_sys)
+            
+            
             if cal_check == True:
                 Impedance_str = np.append(Impedance_str, (10**12) / (np.double(gainfactor[freq_count]) * np.double(Magnitude)))
                 if (real > 0 and im > 0):
-                    Phase_str = np.append(Phase_str, math.atan(np.double(im)/np.double(real)) * 57.2957795 - np.double(sys_phase[freq_count]))
+                    P = math.atan(np.double(im)/np.double(real)) * 57.2957795 - np.double(sys_phase[freq_count])
                 if (real > 0 and im < 0):
-                    Phase_str = np.append(Phase_str, 360 + math.atan(np.double(im)/np.double(real)) * 57.2957795 - np.double(sys_phase[freq_count]))
+                    P = 360 + math.atan(np.double(im)/np.double(real)) * 57.2957795 - np.double(sys_phase[freq_count])
                 if ((real < 0 and im > 0) or (real < 0 and im < 0)):
-                    Phase_str = np.append(Phase_str, 180 + math.atan(np.double(im)/np.double(real)) * 57.2957795 - np.double(sys_phase[freq_count]))
-
+                    P =  180 + math.atan(np.double(im)/np.double(real)) * 57.2957795 - np.double(sys_phase[freq_count])
+                Phase_str = np.append(Phase_str, P)
             freq_count += 1
-            print('f=', freq_count)
-            print('re=', real)
-            print('im=', im)
-            print('rg=', Rgain)
-            print('ig=', Igain)
+            #print('f=', freq_count)
+            #print('rg=', Rgain)
+            #print('ig=', Igain)
             print(Impedance_str)
             print(Phase_str)
 
@@ -184,12 +231,6 @@ class App(QMainWindow):
                                 'Phase':Phase_str})
         csvdata.to_csv(''+ csvname +'.csv')
 
-        '''with open('1R_1R.csv', 'w', newline='') as file:
-            
-            writer = csv.writer(file)
-            writer.writerow(["frequency", "impedance", "phase"])
-            for val_count in range(51):
-                writer.writerow([freqrange[val_count], Impedance_str[val_count], Phase_str[val_count]])'''
 
     def plot(self):
 
@@ -211,16 +252,7 @@ class App(QMainWindow):
 
         line1, = Impedance_plot.plot(xs, Impedance_str, 'b', label='Impedance')
         line2, = Phase_plot.plot(xs, Phase_str, 'r', label='Phase')
-        '''
-        # Create a legend for the first line.
-        first_legend = Impedance_plot.legend(handles=[line1], loc='best')
-
-        # Add the legend manually to the Axes.
-        Impedance_plot.add_artist(first_legend)
-
-        # Create another legend for the second line.
-        Impedance_plot.legend(handles=[line2], loc='best')
-        '''
+        
         Impedance_plot.legend(handles=[line1, line2])
 
     # @pyqtSlot()
